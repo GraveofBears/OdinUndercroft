@@ -27,6 +27,7 @@ namespace OdinUndercroft.Patches
             basementEnv.m_fogColorSunEvening = Color.clear;
             basementEnv.m_fogColorSunMorning = Color.clear;
             basementEnv.m_fogColorSunNight = Color.clear;
+            basementEnv.m_psystems = Array.Empty<GameObject>();
             EnvMan.instance.m_environments.Add(basementEnv);
         }
     }

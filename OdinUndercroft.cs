@@ -25,8 +25,7 @@ namespace OdinUndercroft
         public static string ConnectionError = "";
         private readonly Harmony _harmony = new(ModGUID);
 
-        public static readonly ManualLogSource OdinUndercroftPluginLogger =
-            BepInEx.Logging.Logger.CreateLogSource(ModName);
+        public static readonly ManualLogSource OdinUndercroftPluginLogger = BepInEx.Logging.Logger.CreateLogSource(ModName);
 
         internal static ConfigEntry<int> MaxNestedLimit = null!;
 

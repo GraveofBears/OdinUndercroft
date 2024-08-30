@@ -111,13 +111,9 @@ namespace OdinUndercroft.Patches
             if (Basement.allBasements.Count <= 0) return;
             Type type = typeof(Player).Assembly.GetType("Player+PlacementStatus");
             object moreSpace = type.GetField("MoreSpace").GetValue(__instance);
-            FieldInfo statusField = __instance.GetType()
-                .GetField("m_placementStatus", BindingFlags.NonPublic | BindingFlags.Instance);
-            var ol = Basement.allBasements
-                .Where(x => Vector3.Distance(x.transform.position, ___m_placementGhost.transform.position) <
-                            overlapRadius).Where(x => x.gameObject != ___m_placementGhost);
-            if (ol.Any(x => x.GetComponentInParent<Basement>()) || ___m_placementGhost.transform.position.y >
-                2500 * Mathf.Max(OdinUndercroftPlugin.MaxNestedLimit.Value, 0) + 2000)
+            FieldInfo statusField = __instance.GetType().GetField("m_placementStatus", BindingFlags.NonPublic | BindingFlags.Instance);
+            var ol = Basement.allBasements.Where(x => Vector3.Distance(x.transform.position, ___m_placementGhost.transform.position) < overlapRadius).Where(x => x.gameObject != ___m_placementGhost);
+            if (ol.Any(x => x.GetComponentInParent<Basement>()) || ___m_placementGhost.transform.position.y > 2500 * Mathf.Max(OdinUndercroftPlugin.MaxNestedLimit.Value, 0) + 2000)
             {
                 statusField.SetValue(__instance, moreSpace);
             }
@@ -133,11 +129,7 @@ namespace OdinUndercroft.Patches
                     new CodeMatch(OpCodes.Brfalse),
                     new CodeMatch(OpCodes.Ldloc_S),
                     new CodeMatch(OpCodes.Ldnull),
-                    new CodeMatch(
-                        OpCodes.Call,
-                        AccessTools.Method(
-                            typeof(UnityEngine.Object), "op_Equality",
-                            new Type[] { typeof(UnityEngine.Object), typeof(UnityEngine.Object) })))
+                    new CodeMatch(OpCodes.Call, AccessTools.Method(typeof(UnityEngine.Object), "op_Equality", new Type[] { typeof(UnityEngine.Object), typeof(UnityEngine.Object) })))
                 .Advance(offset: 5)
                 .InsertAndAdvance(Transpilers.EmitDelegate<Func<bool, bool>>(HeightmapIsNullBasemementDelegate))
                 .MatchForward(
@@ -146,11 +138,7 @@ namespace OdinUndercroft.Patches
                     new CodeMatch(OpCodes.Brfalse),
                     new CodeMatch(OpCodes.Ldloc_S),
                     new CodeMatch(OpCodes.Ldnull),
-                    new CodeMatch(
-                        OpCodes.Call,
-                        AccessTools.Method(
-                            typeof(UnityEngine.Object), "op_Equality",
-                            new Type[] { typeof(UnityEngine.Object), typeof(UnityEngine.Object) })))
+                    new CodeMatch(OpCodes.Call, AccessTools.Method(typeof(UnityEngine.Object), "op_Equality", new Type[] { typeof(UnityEngine.Object), typeof(UnityEngine.Object) })))
                 .Advance(offset: 5)
                 .InsertAndAdvance(Transpilers.EmitDelegate<Func<bool, bool>>(HeightmapIsNullBasemementDelegate))
                 .InstructionEnumeration();
