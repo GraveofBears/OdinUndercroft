@@ -1,4 +1,6 @@
 ﻿using HarmonyLib;
+using PieceManager;
+using UnityEngine;
 
 namespace OdinUndercroft.Patches
 {
@@ -7,6 +9,10 @@ namespace OdinUndercroft.Patches
     {
         static void Postfix(Piece __instance, ref bool __result)
         {
+            // Check if the removal check is enabled
+            if (!OdinUndercroft.OdinUndercroftPlugin.EnableRemovalCheck.Value)
+                return;
+
             var basement = __instance.GetComponent<Basement>();
             if (basement)
             {
