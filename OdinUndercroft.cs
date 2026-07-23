@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using BepInEx;
@@ -17,10 +18,11 @@ namespace OdinUndercroft
     [BepInPlugin(ModGUID, ModName, ModVersion)]
     public class OdinUndercroftPlugin : BaseUnityPlugin
     {
-        public const string ModVersion = "1.2.9";
+        public const string ModVersion = "1.3.2";
         public const string ModName = "OdinsUndercroft";
         internal const string Author = "Gravebear";
         private const string ModGUID = "gravebear.odinsundercroft";
+
         private static string _configFileName = ModGUID + ".cfg";
         private static string _configFileFullPath = Paths.ConfigPath + Path.DirectorySeparatorChar + _configFileName;
         public static string ConnectionError = "";
@@ -34,180 +36,162 @@ namespace OdinUndercroft
         internal static ConfigEntry<bool> EnableOURoomA = null!;
         internal static ConfigEntry<bool> EnableOURoomB = null!;
 
+        /// <summary>
+        /// The registered Undercroft prefab, cached so config reloads can re-apply layer toggles
+        /// to the prefab itself and not just to already-placed instances.
+        /// </summary>
+        private static GameObject? _undercroftPrefab;
+
         private void Awake()
         {
             Localizer.Load();
+
             // Bind configs
             MaxNestedLimit = config("General", "Max nested basements", 1,
                 "The maximum number of basements you can incept into each other, changing this setting may cause dungeon collision.");
-            EnableRemovalCheck = config("General", "Enable Removal Check", true, "Enable check to prevent removal of basements with buildings inside."); // Bind new config
+            EnableRemovalCheck = config("General", "Enable Removal Check", true,
+                "Enable check to prevent removal of basements with buildings inside.");
             EnableOUHall = config("General", "Enable OU_Hall", true, "Enable Hall layer on Undercroft");
             EnableOURoomA = config("General", "Enable OU_Room_A", true, "Enable Room A layer on Undercroft");
             EnableOURoomB = config("General", "Enable OU_Room_B", true, "Enable Room B layer on Undercroft");
 
-            BuildPiece OdinsUndercroft = new("odins_undercroft", "OdinsUndercroft");
-            OdinsUndercroft.Category.Set("Undercroft");
-            OdinsUndercroft.RequiredItems.Add("Stone", 200, true);
-            OdinsUndercroft.Prefab.gameObject.AddComponent<Basement>();
+            // Patch first. If anything below throws, the patches are already applied rather than
+            // leaving the game with half-registered pieces and zero Harmony patches.
+            try
+            {
+                Assembly assembly = Assembly.GetExecutingAssembly();
+                _harmony.PatchAll(assembly);
+            }
+            catch (Exception ex)
+            {
+                OdinUndercroftPluginLogger.LogError($"Failed to apply Harmony patches: {ex}");
+            }
 
-            BuildPiece OdinsMinicroft = new("odins_undercroft", "OdinsMinicroft");
-            OdinsMinicroft.Category.Set("Undercroft");
-            OdinsMinicroft.RequiredItems.Add("Stone", 50, true);
-            OdinsMinicroft.Prefab.gameObject.AddComponent<Basement>();
+            try
+            {
+                Functions.RegisterAllSFX();
+            }
+            catch (Exception ex)
+            {
+                OdinUndercroftPluginLogger.LogError($"Failed to register SFX prefabs: {ex}");
+            }
 
-            BuildPiece OU_MetalGrate = new("odins_undercroft", "OU_MetalGrate");
-            OU_MetalGrate.Category.Set("Undercroft");
-            OU_MetalGrate.RequiredItems.Add("Iron", 1, true);
+            RegisterPieces();
 
-            BuildPiece OU_Urn = new("odins_undercroft", "OU_Urn");
-            OU_Urn.Category.Set("Undercroft");
-            OU_Urn.RequiredItems.Add("Stone", 6, true);
-
-            BuildPiece OU_Sarcophagus = new("odins_undercroft", "OU_Sarcophagus");
-            OU_Sarcophagus.Category.Set("Undercroft");
-            OU_Sarcophagus.RequiredItems.Add("Stone", 10, true);
-
-            BuildPiece OU_Sarcophagus_Lid = new("odins_undercroft", "OU_Sarcophagus_Lid");
-            OU_Sarcophagus_Lid.Category.Set("Undercroft");
-            OU_Sarcophagus_Lid.RequiredItems.Add("Stone", 3, true);
-
-            BuildPiece OU_Skeleton_Full = new("odins_undercroft", "OU_Skeleton_Full");
-            OU_Skeleton_Full.Category.Set("Undercroft");
-            OU_Skeleton_Full.RequiredItems.Add("BoneFragments", 4, true);
-
-            BuildPiece OU_Skeleton_Ribs = new("odins_undercroft", "OU_Skeleton_Ribs");
-            OU_Skeleton_Ribs.Category.Set("Undercroft");
-            OU_Skeleton_Ribs.RequiredItems.Add("BoneFragments", 2, true);
-
-            BuildPiece OU_Skeleton_Hanging = new("odins_undercroft", "OU_Skeleton_Hanging");
-            OU_Skeleton_Hanging.Category.Set("Undercroft");
-            OU_Skeleton_Hanging.RequiredItems.Add("BoneFragments", 2, true);
-
-            BuildPiece OU_Skeleton_Pile = new("odins_undercroft", "OU_Skeleton_Pile");
-            OU_Skeleton_Pile.Category.Set("Undercroft");
-            OU_Skeleton_Pile.RequiredItems.Add("BoneFragments", 2, true);
-
-            BuildPiece OU_StoneArchway = new("odins_undercroft", "OU_StoneArchway");
-            OU_StoneArchway.Category.Set("Undercroft");
-            OU_StoneArchway.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_StoneWall = new("odins_undercroft", "OU_StoneWall");
-            OU_StoneWall.Category.Set("Undercroft");
-            OU_StoneWall.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_StoneHalfWall = new("odins_undercroft", "OU_StoneHalfWall");
-            OU_StoneHalfWall.Category.Set("Undercroft");
-            OU_StoneHalfWall.RequiredItems.Add("Stone", 1, true);
-
-            BuildPiece OU_Stone_Floor_1x1 = new("odins_undercroft", "OU_Stone_Floor_1x1");
-            OU_Stone_Floor_1x1.Category.Set("Undercroft");
-            OU_Stone_Floor_1x1.RequiredItems.Add("Stone", 1, true);
-
-            BuildPiece OU_Stone_Floor_2x1 = new("odins_undercroft", "OU_Stone_Floor_2x1");
-            OU_Stone_Floor_2x1.Category.Set("Undercroft");
-            OU_Stone_Floor_2x1.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_Stone_Floor_2x2 = new("odins_undercroft", "OU_Stone_Floor_2x2");
-            OU_Stone_Floor_2x2.Category.Set("Undercroft");
-            OU_Stone_Floor_2x2.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_Stone_Roof_45 = new("odins_undercroft", "OU_Stone_Roof_45");
-            OU_Stone_Roof_45.Category.Set("Undercroft");
-            OU_Stone_Roof_45.RequiredItems.Add("Stone", 2, true);
-            MaterialReplacer.RegisterGameObjectForShaderSwap(OU_Stone_Roof_45.Prefab, MaterialReplacer.ShaderType.UseUnityShader);
-
-            BuildPiece OU_Stone_Outter_Corner = new("odins_undercroft", "OU_Stone_Outter_Corner");
-            OU_Stone_Outter_Corner.Category.Set("Undercroft");
-            OU_Stone_Outter_Corner.RequiredItems.Add("Stone", 2, true);
-            MaterialReplacer.RegisterGameObjectForShaderSwap(OU_Stone_Outter_Corner.Prefab, MaterialReplacer.ShaderType.UseUnityShader);
-
-            BuildPiece OU_Stone_Roof_Corner = new("odins_undercroft", "OU_Stone_Roof_Corner");
-            OU_Stone_Roof_Corner.Category.Set("Undercroft");
-            OU_Stone_Roof_Corner.RequiredItems.Add("Stone", 2, true);
-            MaterialReplacer.RegisterGameObjectForShaderSwap(OU_Stone_Roof_Corner.Prefab, MaterialReplacer.ShaderType.UseUnityShader);
-
-            BuildPiece OU_DrainPipe = new("odins_undercroft", "OU_DrainPipe");
-            OU_DrainPipe.Category.Set("Undercroft");
-            OU_DrainPipe.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_CornerCap = new("odins_undercroft", "OU_CornerCap");
-            OU_CornerCap.Category.Set("Undercroft");
-            OU_CornerCap.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_CornerCap_Small = new("odins_undercroft", "OU_CornerCap_Small");
-            OU_CornerCap_Small.Category.Set("Undercroft");
-            OU_CornerCap_Small.RequiredItems.Add("Stone", 1, true);
-
-            BuildPiece OU_StoneBeam = new("odins_undercroft", "OU_StoneBeam");
-            OU_StoneBeam.Category.Set("Undercroft");
-            OU_StoneBeam.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_StoneBeam_Small = new("odins_undercroft", "OU_StoneBeam_Small");
-            OU_StoneBeam_Small.Category.Set("Undercroft");
-            OU_StoneBeam_Small.RequiredItems.Add("Stone", 1, true);
-
-            BuildPiece OU_Iron_Cage = new("odins_undercroft", "OU_Iron_Cage");
-            OU_Iron_Cage.Category.Set("Undercroft");
-            OU_Iron_Cage.RequiredItems.Add("Iron", 4, true);
-
-            BuildPiece OU_Metal_Cage = new("odins_undercroft", "OU_Metal_Cage");
-            OU_Metal_Cage.Category.Set("Undercroft");
-            OU_Metal_Cage.RequiredItems.Add("BlackMetal", 4, true);
-
-            BuildPiece OU_Swords_Crossed = new("odins_undercroft", "OU_Swords_Crossed");
-            OU_Swords_Crossed.Category.Set("Undercroft");
-            OU_Swords_Crossed.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_Wall_Shield = new("odins_undercroft", "OU_Wall_Shield");
-            OU_Wall_Shield.Category.Set("Undercroft");
-            OU_Wall_Shield.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_StoneRoof_Tile = new("odins_undercroft", "OU_StoneRoof_Tile");
-            OU_StoneRoof_Tile.Category.Set("Undercroft");
-            OU_StoneRoof_Tile.RequiredItems.Add("Stone", 2, true);
-            MaterialReplacer.RegisterGameObjectForShaderSwap(OU_StoneRoof_Tile.Prefab, MaterialReplacer.ShaderType.UseUnityShader);
-
-            BuildPiece OU_StoneFloor = new("odins_undercroft", "OU_StoneFloor");
-            OU_StoneFloor.Category.Set("Undercroft");
-            OU_StoneFloor.RequiredItems.Add("Stone", 2, true);
-
-            BuildPiece OU_StoneStair = new("odins_undercroft", "OU_StoneStair");
-            OU_StoneStair.Category.Set("Undercroft");
-            OU_StoneStair.RequiredItems.Add("Stone", 6, true);
-
-            BuildPiece OU_Large_Stone_Pillar = new("odins_undercroft", "OU_Large_Stone_Pillar");
-            OU_Large_Stone_Pillar.Category.Set("Undercroft");
-            OU_Large_Stone_Pillar.RequiredItems.Add("Stone", 10, true);
-
-            BuildPiece OU_Medium_Stone_Pillar = new("odins_undercroft", "OU_Medium_Stone_Pillar");
-            OU_Medium_Stone_Pillar.Category.Set("Undercroft");
-            OU_Medium_Stone_Pillar.RequiredItems.Add("Stone", 6, true);
-
-            BuildPiece OH_Undercroft_BuildSkull = new("odins_undercroft", "OH_Undercroft_BuildSkull");
-            OH_Undercroft_BuildSkull.Category.Set("Undercroft");
-            OH_Undercroft_BuildSkull.RequiredItems.Add("BoneFragments", 1, true);
-
-            ToggleLayers(OdinsUndercroft.Prefab);
-
-            Assembly assembly = Assembly.GetExecutingAssembly();
-            _harmony.PatchAll(assembly);
             SetupWatcher();
         }
 
-        private void ToggleLayers(GameObject prefab)
+        private void RegisterPieces()
         {
-            Transform interior = prefab.transform.Find("interior/enabled");
-            if (interior != null)
+            BuildPiece? odinsUndercroft = RegisterPiece("OdinsUndercroft", "Stone", 200, isBasement: true);
+            _undercroftPrefab = odinsUndercroft?.Prefab;
+
+            RegisterPiece("OdinsMinicroft", "Stone", 50, isBasement: true);
+
+            RegisterPiece("OU_MetalGrate", "Iron", 1);
+            RegisterPiece("OU_Urn", "Stone", 6);
+            RegisterPiece("OU_Sarcophagus", "Stone", 10);
+            RegisterPiece("OU_Sarcophagus_Lid", "Stone", 3);
+
+            RegisterPiece("OU_Skeleton_Full", "BoneFragments", 4);
+            RegisterPiece("OU_Skeleton_Ribs", "BoneFragments", 2);
+            RegisterPiece("OU_Skeleton_Hanging", "BoneFragments", 2);
+            RegisterPiece("OU_Skeleton_Pile", "BoneFragments", 2);
+
+            RegisterPiece("OU_StoneArchway", "Stone", 2);
+            RegisterPiece("OU_StoneWall", "Stone", 2);
+            RegisterPiece("OU_StoneHalfWall", "Stone", 1);
+
+            RegisterPiece("OU_Stone_Floor_1x1", "Stone", 1);
+            RegisterPiece("OU_Stone_Floor_2x1", "Stone", 2);
+            RegisterPiece("OU_Stone_Floor_2x2", "Stone", 2);
+
+            RegisterPiece("OU_Stone_Roof_45", "Stone", 2, shaderSwap: true);
+            RegisterPiece("OU_Stone_Outter_Corner", "Stone", 2, shaderSwap: true);
+            RegisterPiece("OU_Stone_Roof_Corner", "Stone", 2, shaderSwap: true);
+
+            RegisterPiece("OU_DrainPipe", "Stone", 2);
+            RegisterPiece("OU_CornerCap", "Stone", 2);
+            RegisterPiece("OU_CornerCap_Small", "Stone", 1);
+            RegisterPiece("OU_StoneBeam", "Stone", 2);
+            RegisterPiece("OU_StoneBeam_Small", "Stone", 1);
+
+            RegisterPiece("OU_Iron_Cage", "Iron", 4);
+            RegisterPiece("OU_Metal_Cage", "BlackMetal", 4);
+
+            RegisterPiece("OU_Swords_Crossed", "Stone", 2);
+            RegisterPiece("OU_Wall_Shield", "Stone", 2);
+
+            RegisterPiece("OU_StoneRoof_Tile", "Stone", 2, shaderSwap: true);
+            RegisterPiece("OU_StoneFloor", "Stone", 2);
+            RegisterPiece("OU_StoneStair", "Stone", 6);
+
+            RegisterPiece("OU_Large_Stone_Pillar", "Stone", 10);
+            RegisterPiece("OU_Medium_Stone_Pillar", "Stone", 6);
+
+            RegisterPiece("OH_Undercroft_BuildSkull", "BoneFragments", 1);
+
+            if (_undercroftPrefab != null)
             {
-                Transform OU_Hall = interior.Find("OU_Hall");
-                if (OU_Hall != null) OU_Hall.gameObject.SetActive(EnableOUHall.Value);
-
-                Transform OU_Room_A = interior.Find("OU_Room_A");
-                if (OU_Room_A != null) OU_Room_A.gameObject.SetActive(EnableOURoomA.Value);
-
-                Transform OU_Room_B = interior.Find("OU_Room_B");
-                if (OU_Room_B != null) OU_Room_B.gameObject.SetActive(EnableOURoomB.Value);
+                ToggleLayers(_undercroftPrefab);
             }
+        }
+
+        /// <summary>
+        /// Registers a single build piece. A failure on one prefab (missing asset, bundle mismatch,
+        /// missing Basement type) is logged and skipped instead of aborting the whole registration.
+        /// </summary>
+        private static BuildPiece? RegisterPiece(string prefabName, string requiredItem, int amount,
+            bool shaderSwap = false, bool isBasement = false)
+        {
+            try
+            {
+                BuildPiece piece = new("odins_undercroft", prefabName);
+                piece.Category.Set("Undercroft");
+                piece.RequiredItems.Add(requiredItem, amount, true);
+
+                if (shaderSwap)
+                {
+                    MaterialReplacer.RegisterGameObjectForShaderSwap(piece.Prefab,
+                        MaterialReplacer.ShaderType.UseUnityShader);
+                }
+
+                if (isBasement)
+                {
+                    if (piece.Prefab == null)
+                    {
+                        OdinUndercroftPluginLogger.LogError(
+                            $"Prefab '{prefabName}' resolved to null; cannot attach Basement component.");
+                        return piece;
+                    }
+
+                    piece.Prefab.gameObject.AddComponent<Basement>();
+                }
+
+                return piece;
+            }
+            catch (Exception ex)
+            {
+                OdinUndercroftPluginLogger.LogError($"Failed to register piece '{prefabName}': {ex}");
+                return null;
+            }
+        }
+
+        private static void ToggleLayers(GameObject prefab)
+        {
+            if (prefab == null) return;
+
+            Transform interior = prefab.transform.Find("interior/enabled");
+            if (interior == null) return;
+
+            Transform OU_Hall = interior.Find("OU_Hall");
+            if (OU_Hall != null) OU_Hall.gameObject.SetActive(EnableOUHall.Value);
+
+            Transform OU_Room_A = interior.Find("OU_Room_A");
+            if (OU_Room_A != null) OU_Room_A.gameObject.SetActive(EnableOURoomA.Value);
+
+            Transform OU_Room_B = interior.Find("OU_Room_B");
+            if (OU_Room_B != null) OU_Room_B.gameObject.SetActive(EnableOURoomB.Value);
         }
 
         private void OnDestroy()
@@ -234,15 +218,24 @@ namespace OdinUndercroft
                 OdinUndercroftPluginLogger.LogDebug("ReadConfigValues called");
                 Config.Reload();
 
-                // Loop through all instances of the OdinsUndercroft prefab and apply layer toggles
-                foreach (var instance in FindObjectsOfType<Basement>())
+                // Re-apply layer toggles to the prefab itself...
+                if (_undercroftPrefab != null)
                 {
-                    ToggleLayers(instance.gameObject);
+                    ToggleLayers(_undercroftPrefab);
+                }
+
+                // ...and to anything already placed in the world.
+                foreach (Basement instance in FindObjectsOfType<Basement>())
+                {
+                    if (instance != null)
+                    {
+                        ToggleLayers(instance.gameObject);
+                    }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                OdinUndercroftPluginLogger.LogError($"There was an issue loading your {_configFileName}");
+                OdinUndercroftPluginLogger.LogError($"There was an issue loading your {_configFileName}: {ex}");
                 OdinUndercroftPluginLogger.LogError("Please check your config entries for spelling and format!");
             }
         }
